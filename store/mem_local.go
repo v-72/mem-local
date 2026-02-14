@@ -17,9 +17,12 @@ func (s *MemLocalStore) Set(k string, v string) bool {
 func (s *MemLocalStore) Get(k string) (string, bool) {
 	// Initialize the map if it's nil
 	if s.Data == nil {
-		return ("", false)
+		return "", false
 	}
-	val:= s.Data[k]
-	return (val, true)
+	val, ok:= s.Data[k]
+	if !ok{
+		return val, false
+	} 
+	return val, true
 }
  
