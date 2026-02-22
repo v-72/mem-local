@@ -1,8 +1,80 @@
 package store
 
 import (
+	"strconv"
+	"sync"
 	"testing"
 )
+
+func TestConcurrentSetMultipleKeys(t *testing.T) {
+	s := &MemLocalStore{}
+	s.Init()
+
+	const n = 100
+	var wg sync.WaitGroup
+	wg.Add(n)
+
+	for i := 0; i < n; i++ {
+		i := i
+		go func() {
+			defer wg.Done()
+			key := "key" + strconv.Itoa(i)
+			val := "value" + strconv.Itoa(i)
+			if err := s.Set(key, val); err != nil {
+				t.Errorf("Set failed for %s: %v", key, err)
+			}
+		}()
+	}
+	wg.Wait()
+
+	// Check all keys
+	for i := 0; i < n; i++ {
+		key := "key" + strconv.Itoa(i)
+		val, ok := s.Get(key)
+		if !ok || val != "value"+strconv.Itoa(i) {
+			t.Errorf("Get(%s) = %v, %v; want value%d, true", key, val, ok, i)
+		}
+	}
+}
+
+func TestConcurrentSetAndGetMultipleKeys(t *testing.T) {
+	s := &MemLocalStore{}
+	s.Init()
+
+	const n = 100
+	var wg sync.WaitGroup
+
+	// Set keys concurrently
+	wg.Add(n)
+	for i := 0; i < n; i++ {
+		i := i
+		go func() {
+			defer wg.Done()
+			key := "key" + strconv.Itoa(i)
+			val := "value" + strconv.Itoa(i)
+			if err := s.Set(key, val); err != nil {
+				t.Errorf("Set failed for %s: %v", key, err)
+			}
+		}()
+	}
+
+	// Get keys concurrently
+	wg.Add(n)
+	for i := 0; i < n; i++ {
+		i := i
+		go func() {
+			defer wg.Done()
+			key := "key" + strconv.Itoa(i)
+			val, ok := s.Get(key)
+			// Accept either not found or correct value, since gets may race with sets
+			if ok && val != "value"+strconv.Itoa(i) {
+				t.Errorf("Concurrent Get(%s) = %v, want value%d or not found", key, val, i)
+			}
+		}()
+	}
+
+	wg.Wait()
+}
 
 func TestInit(t *testing.T) {
 	s := &MemLocalStore{}
