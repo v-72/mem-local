@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+
 	"github.com/v-72/mem-local/store"
 )
 
@@ -10,6 +11,7 @@ func main() {
 	s := &store.MemLocalStore{}
 	setStatus := s.Set("test", "test")
 	fmt.Println("setStatus:", setStatus)
-	val,_:=s.Get("11")
+	val, _ := s.Get("test")
+	fmt.Println(val)
 	fmt.Println("value from cache", val)
 }
