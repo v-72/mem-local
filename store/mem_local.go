@@ -28,12 +28,18 @@ func (s *MemLocalStore) getData(key string, dataChan chan GetResult) {
 	}
 }
 
-func (s *MemLocalStore) Set(k string, v string) bool {
+func (s *MemLocalStore) setData(k string, v string, dataChan chan bool) {
 	if s.Data == nil {
 		s.Data = make(map[string]string)
 	}
 	s.Data[k] = v
-	return true
+	dataChan <- true
+}
+
+func (s *MemLocalStore) Set(k string, v string) bool {
+	dataChan := make(chan bool)
+	go s.setData(k, v, dataChan)
+	return <-dataChan
 }
 
 func (s *MemLocalStore) Get(k string) (string, bool) {
