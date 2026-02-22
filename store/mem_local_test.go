@@ -10,58 +10,64 @@ func TestInit(t *testing.T) {
 	if err != nil {
 		t.Errorf("Init() returned error: %v", err)
 	}
-	if s.Data == nil {
-		t.Error("Init() did not initialize Data map")
-	}
-	if len(s.Data) != 0 {
-		t.Errorf("Init() did not create empty map, got length %d", len(s.Data))
+	// After Init, getting any key should return not-ok.
+	if val, ok := s.Get("any"); ok || val != "" {
+		t.Errorf("Init() did not create empty store, got %v, %v", val, ok)
 	}
 }
 
 func TestSet(t *testing.T) {
 	s := &MemLocalStore{}
 	s.Init()
-
-	result := s.Set("key1", "value1")
-	if !result {
-		t.Error("Set() returned false, expected true")
+	if err := s.Set("key1", "value1"); err != nil {
+		t.Errorf("Set() returned error: %v", err)
 	}
 
-	if s.Data["key1"] != "value1" {
-		t.Errorf("Set() did not store value correctly, got %s", s.Data["key1"])
+	val, ok := s.Get("key1")
+	if !ok || val != "value1" {
+		t.Errorf("Set() did not store value correctly, got %v, %v", val, ok)
 	}
 }
 
 func TestSetMultiple(t *testing.T) {
 	s := &MemLocalStore{}
 	s.Init()
+	keys := []struct{ k, v string }{{"key1", "value1"}, {"key2", "value2"}, {"key3", "value3"}}
+	for _, kv := range keys {
+		if err := s.Set(kv.k, kv.v); err != nil {
+			t.Fatalf("Set(%s) error: %v", kv.k, err)
+		}
+	}
 
-	s.Set("key1", "value1")
-	s.Set("key2", "value2")
-	s.Set("key3", "value3")
-
-	if len(s.Data) != 3 {
-		t.Errorf("Set() multiple values failed, expected 3 items, got %d", len(s.Data))
+	for _, kv := range keys {
+		val, ok := s.Get(kv.k)
+		if !ok || val != kv.v {
+			t.Errorf("Get(%s) returned %v,%v expected %s,true", kv.k, val, ok, kv.v)
+		}
 	}
 }
 
 func TestSetOverwrite(t *testing.T) {
 	s := &MemLocalStore{}
 	s.Init()
+	if err := s.Set("key1", "value1"); err != nil {
+		t.Fatalf("Set error: %v", err)
+	}
+	if err := s.Set("key1", "value2"); err != nil {
+		t.Fatalf("Set error: %v", err)
+	}
 
-	s.Set("key1", "value1")
-	s.Set("key1", "value2")
-
-	if s.Data["key1"] != "value2" {
-		t.Errorf("Set() overwrite failed, expected value2, got %s", s.Data["key1"])
+	if val, ok := s.Get("key1"); !ok || val != "value2" {
+		t.Errorf("Set() overwrite failed, expected value2, got %v,%v", val, ok)
 	}
 }
 
 func TestGet(t *testing.T) {
 	s := &MemLocalStore{}
 	s.Init()
-
-	s.Set("key1", "value1")
+	if err := s.Set("key1", "value1"); err != nil {
+		t.Fatalf("Set error: %v", err)
+	}
 	val, ok := s.Get("key1")
 
 	if !ok {
@@ -75,7 +81,6 @@ func TestGet(t *testing.T) {
 func TestGetNonExistent(t *testing.T) {
 	s := &MemLocalStore{}
 	s.Init()
-
 	val, ok := s.Get("nonexistent")
 
 	if ok {
@@ -88,7 +93,6 @@ func TestGetNonExistent(t *testing.T) {
 
 func TestGetWithoutInit(t *testing.T) {
 	s := &MemLocalStore{}
-
 	val, ok := s.Get("key1")
 
 	if ok {
@@ -101,17 +105,12 @@ func TestGetWithoutInit(t *testing.T) {
 
 func TestSetWithoutInit(t *testing.T) {
 	s := &MemLocalStore{}
-
-	result := s.Set("key1", "value1")
-
-	if !result {
-		t.Error("Set() returned false, expected true")
+	if err := s.Set("key1", "value1"); err != nil {
+		t.Errorf("Set() returned error, expected nil: %v", err)
 	}
-	if s.Data == nil {
-		t.Error("Set() did not initialize Data map when nil")
-	}
-	if s.Data["key1"] != "value1" {
-		t.Errorf("Set() without Init failed, got %s", s.Data["key1"])
+	val, ok := s.Get("key1")
+	if !ok || val != "value1" {
+		t.Errorf("Set() without Init failed, got %v,%v", val, ok)
 	}
 }
 
@@ -126,7 +125,9 @@ func TestGetMultiple(t *testing.T) {
 	}
 
 	for k, v := range testCases {
-		s.Set(k, v)
+		if err := s.Set(k, v); err != nil {
+			t.Fatalf("Set(%s) error: %v", k, err)
+		}
 	}
 
 	for k, expected := range testCases {
@@ -143,8 +144,9 @@ func TestGetMultiple(t *testing.T) {
 func TestEmptyStringValue(t *testing.T) {
 	s := &MemLocalStore{}
 	s.Init()
-
-	s.Set("emptyKey", "")
+	if err := s.Set("emptyKey", ""); err != nil {
+		t.Fatalf("Set error: %v", err)
+	}
 	val, ok := s.Get("emptyKey")
 
 	if !ok {
