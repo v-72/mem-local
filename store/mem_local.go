@@ -1,12 +1,15 @@
 package store
 
+type Store interface {
+	Set(string, string) bool
+	Get(string) (string, bool)
+}
+
 type MemLocalStore struct {
-	// Declaration: map[keyType]valueType
 	Data map[string]string 
 }
 
 func (s *MemLocalStore) Set(k string, v string) bool {
-	// Initialize the map if it's nil
 	if s.Data == nil {
 		s.Data = make(map[string]string)
 	}
@@ -15,7 +18,6 @@ func (s *MemLocalStore) Set(k string, v string) bool {
 }
 
 func (s *MemLocalStore) Get(k string) (string, bool) {
-	// Initialize the map if it's nil
 	if s.Data == nil {
 		return "", false
 	}
