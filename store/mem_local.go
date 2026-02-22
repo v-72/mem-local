@@ -7,7 +7,12 @@ type Store interface {
 }
 
 type MemLocalStore struct {
-	Data map[string]string 
+	Data map[string]string
+}
+
+type GetResult struct {
+	value string
+	ok    bool
 }
 
 func (s *MemLocalStore) Init() error {
@@ -15,6 +20,13 @@ func (s *MemLocalStore) Init() error {
 	return nil
 }
 
+func (s *MemLocalStore) getData(key string, dataChan chan GetResult) {
+	if val, ok := s.Data[key]; ok {
+		dataChan <- GetResult{value: val, ok: ok}
+	} else {
+		dataChan <- GetResult{value: "", ok: false}
+	}
+}
 
 func (s *MemLocalStore) Set(k string, v string) bool {
 	if s.Data == nil {
@@ -25,13 +37,8 @@ func (s *MemLocalStore) Set(k string, v string) bool {
 }
 
 func (s *MemLocalStore) Get(k string) (string, bool) {
-	if s.Data == nil {
-		return "", false
-	}
-	val, ok:= s.Data[k]
-	if !ok{
-		return val, false
-	} 
-	return val, true
+	dataChan := make(chan GetResult)
+	go s.getData(k, dataChan)
+	result := <-dataChan
+	return result.value, result.ok
 }
- 
