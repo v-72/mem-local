@@ -7,6 +7,7 @@ type Store interface {
 	Set(string, string) error
 	Get(string) (string, bool)
 	Delete(string) error
+	Exists(string) bool
 }
 
 type MemLocalStore struct {
@@ -48,4 +49,12 @@ func (s *MemLocalStore) Delete(k string) error {
 
 	delete(s.data, k)
 	return nil
+}
+
+func (s *MemLocalStore) Exists(k string) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	_, ok := s.data[k]
+	return ok
 }
