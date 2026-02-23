@@ -260,3 +260,17 @@ func TestDelete(t *testing.T) {
 		t.Errorf("Get() returned non-empty value for deleted key, got %s", val)
 	}
 }
+
+func TestExists(t *testing.T) {
+	s := &MemLocalStore{}
+	s.Init()
+	if err := s.Set("key1", "value1"); err != nil {
+		t.Fatalf("Set error: %v", err)
+	}
+	if !s.Exists("key1") {
+		t.Error("Exists() returned false for existing key, expected true")
+	}
+	if s.Exists("nonexistent") {
+		t.Error("Exists() returned true for non-existent key, expected false")
+	}
+}
