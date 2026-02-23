@@ -232,3 +232,31 @@ func TestEmptyStringValue(t *testing.T) {
 func TestStoreInterface(t *testing.T) {
 	var _ Store = (*MemLocalStore)(nil)
 }
+
+func TestDelete(t *testing.T) {
+	s := &MemLocalStore{}
+	s.Init()
+	if err := s.Set("key1", "value1"); err != nil {
+		t.Fatalf("Set error: %v", err)
+	}
+	val, ok := s.Get("key1")
+
+	if !ok {
+		t.Error("Get() returned false for existing key, expected true")
+	}
+	if val != "value1" {
+		t.Errorf("Get() returned wrong value, expected value1, got %s", val)
+	}
+
+	if err := s.Delete("key1"); err != nil {
+		t.Fatalf("Delete error: %v", err)
+	}
+
+	val, ok = s.Get("key1")
+	if ok {
+		t.Error("Get() returned true for deleted key, expected false")
+	}
+	if val != "" {
+		t.Errorf("Get() returned non-empty value for deleted key, got %s", val)
+	}
+}
