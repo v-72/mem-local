@@ -1,30 +1,51 @@
 package store
 
+import "sync"
+
 type Store interface {
-	Set(string, string) bool
+	Init() error
+	Set(string, string) error
 	Get(string) (string, bool)
+	Delete(string) error
 }
 
 type MemLocalStore struct {
-	Data map[string]string 
+	mu   sync.RWMutex
+	data map[string]string
 }
 
-func (s *MemLocalStore) Set(k string, v string) bool {
-	if s.Data == nil {
-		s.Data = make(map[string]string)
+func (s *MemLocalStore) Init() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.data = make(map[string]string)
+	return nil
+}
+
+func (s *MemLocalStore) Set(k, v string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.data == nil {
+		s.data = make(map[string]string)
 	}
-	s.Data[k] = v
-	return true
+
+	s.data[k] = v
+	return nil
 }
 
 func (s *MemLocalStore) Get(k string) (string, bool) {
-	if s.Data == nil {
-		return "", false
-	}
-	val, ok:= s.Data[k]
-	if !ok{
-		return val, false
-	} 
-	return val, true
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	val, ok := s.data[k]
+	return val, ok
 }
- 
+
+func (s *MemLocalStore) Delete(k string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	delete(s.data, k)
+	return nil
+}
