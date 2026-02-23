@@ -20,4 +20,13 @@ func main() {
 	val, _ := s.Get("TestKey")
 	fmt.Println(val)
 	fmt.Println("value from cache", val)
+
+	deleteStatus := s.Delete("TestKey")
+	fmt.Println("\ndeleteStatus:", deleteStatus)
+	val, ok := s.Get("TestKey")
+	if !ok {
+		fmt.Println("Key not found after deletion")
+	} else {
+		fmt.Println("Value after deletion:", val)
+	}
 }
