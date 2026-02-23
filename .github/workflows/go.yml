@@ -34,4 +34,4 @@ jobs:
         threshold-file: 95
         threshold-package: 95
         threshold-total: 98
-        exclude-packages: ./example/...
+        exclude-packages: ./example.go
