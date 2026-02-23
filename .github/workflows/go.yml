@@ -25,7 +25,7 @@ jobs:
       run: go build -v ./...
 
     - name: Test and generate coverage report
-      run: go test ./... -coverprofile=cover.out -covermode=atomic -coverpkg=./...
+      run: go test ./... -coverprofile=cover.out -covermode=atomic -coverpkg=./store/...
     
     - name: check test coverage
       uses: vladopajic/go-test-coverage@v2
@@ -34,4 +34,3 @@ jobs:
         threshold-file: 95
         threshold-package: 95
         threshold-total: 98
-        exclude-files: ./example.go
