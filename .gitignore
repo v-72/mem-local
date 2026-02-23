@@ -32,3 +32,6 @@ go.work
 # Build output
 /build/
 /bin/
+
+coverage.html
+cover.out
