@@ -274,3 +274,24 @@ func TestExists(t *testing.T) {
 		t.Error("Exists() returned true for non-existent key, expected false")
 	}
 }
+
+func TestSetMany(t *testing.T) {
+	s := &MemLocalStore{}
+	s.Init()
+	testCases := map[string]string{
+		"key1": "value1",
+		"key2": "value2",
+		"key3": "value3",
+	}
+	for k, v := range testCases {
+		if err := s.Set(k, v); err != nil {
+			t.Fatalf("Set(%s) error: %v", k, err)
+		}
+	}
+	if !s.Exists("key1") {
+		t.Error("Exists() returned false for existing key, expected true")
+	}
+	if s.Exists("nonexistent") {
+		t.Error("Exists() returned true for non-existent key, expected false")
+	}
+}
