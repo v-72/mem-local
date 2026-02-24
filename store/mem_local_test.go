@@ -283,15 +283,17 @@ func TestSetMany(t *testing.T) {
 		"key2": "value2",
 		"key3": "value3",
 	}
-	for k, v := range testCases {
-		if err := s.Set(k, v); err != nil {
-			t.Fatalf("Set(%s) error: %v", k, err)
+	if err := s.SetMany(testCases); err != nil {
+		t.Fatalf("SetMany() error: %v", err)
+	}
+
+	for k, expected := range testCases {
+		val, ok := s.Get(k)
+		if !ok {
+			t.Errorf("Get(%s) returned false, expected true", k)
 		}
-	}
-	if !s.Exists("key1") {
-		t.Error("Exists() returned false for existing key, expected true")
-	}
-	if s.Exists("nonexistent") {
-		t.Error("Exists() returned true for non-existent key, expected false")
+		if val != expected {
+			t.Errorf("Get(%s) returned %s, expected %s", k, val, expected)
+		}
 	}
 }
