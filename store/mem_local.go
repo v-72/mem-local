@@ -8,6 +8,7 @@ type Store interface {
 	Get(string) (string, bool)
 	Delete(string) error
 	Exists(string) bool
+	SetMany(map[string]string) error
 }
 
 type MemLocalStore struct {
@@ -57,4 +58,18 @@ func (s *MemLocalStore) Exists(k string) bool {
 
 	_, ok := s.data[k]
 	return ok
+}
+
+func (s *MemLocalStore) SetMany(kv map[string]string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.data == nil {
+		s.data = make(map[string]string)
+	}
+
+	for k, v := range kv {
+		s.data[k] = v
+	}
+	return nil
 }
