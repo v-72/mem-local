@@ -277,7 +277,6 @@ func TestExists(t *testing.T) {
 
 func TestSetMany(t *testing.T) {
 	s := &MemLocalStore{}
-	s.Init()
 	testCases := map[string]string{
 		"key1": "value1",
 		"key2": "value2",
