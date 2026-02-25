@@ -1,7 +1,6 @@
 package store
 
 import (
-	"fmt"
 	"sync"
 )
 
@@ -79,9 +78,6 @@ func (s *MemLocalStore) SetMany(kv map[string]string) error {
 }
 
 func (s *MemLocalStore) GetMany(keys []string) []string {
-
-	fmt.Println("keys", keys)
-
 	if len(keys) == 0 {
 		return []string{}
 	}
