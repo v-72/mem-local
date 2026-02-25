@@ -1,8 +1,6 @@
 package store
 
-import (
-	"sync"
-)
+import "sync"
 
 type Store interface {
 	Init() error
