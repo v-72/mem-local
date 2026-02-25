@@ -1,6 +1,9 @@
 package store
 
-import "sync"
+import (
+	"fmt"
+	"sync"
+)
 
 type Store interface {
 	Init() error
@@ -76,15 +79,18 @@ func (s *MemLocalStore) SetMany(kv map[string]string) error {
 }
 
 func (s *MemLocalStore) GetMany(keys []string) []string {
+
+	fmt.Println("keys", keys)
+
 	if len(keys) == 0 {
 		return []string{}
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	result := make([]string, 0, len(keys))
+	result := []string{}
 
-	for i, key := range keys {
-		result[i] = s.data[key]
+	for _, key := range keys {
+		result = append(result, s.data[key])
 	}
 
 	return result

@@ -296,3 +296,153 @@ func TestSetMany(t *testing.T) {
 		}
 	}
 }
+
+func TestGetMany(t *testing.T) {
+	s := &MemLocalStore{}
+	s.Init()
+
+	testCases := map[string]string{
+		"key1": "value1",
+		"key2": "value2",
+		"key3": "value3",
+	}
+
+	s.SetMany(testCases)
+
+	keys := []string{"key1", "key2", "key3"}
+	values := s.GetMany(keys)
+
+	if len(values) != len(keys) {
+		t.Errorf("GetMany() returned %d values, expected %d", len(values), len(keys))
+	}
+
+	for i, key := range keys {
+		if values[i] != testCases[key] {
+			t.Errorf("GetMany() returned %s for key %s, expected %s", values[i], key, testCases[key])
+		}
+	}
+}
+
+func TestGetManyEmpty(t *testing.T) {
+	s := &MemLocalStore{}
+	s.Init()
+
+	keys := []string{"key1", "key2", "key3"}
+	values := s.GetMany(keys)
+
+	if len(values) != len(keys) {
+		t.Errorf("GetMany() returned %d values, expected %d", len(values), len(keys))
+	}
+
+	for _, value := range values {
+		if value != "" {
+			t.Errorf("GetMany() returned non-empty value %s, expected empty", value)
+		}
+	}
+}
+
+func TestGetManyNonExistent(t *testing.T) {
+	s := &MemLocalStore{}
+	s.Init()
+
+	keys := []string{"nonexistent1", "nonexistent2", "nonexistent3"}
+	values := s.GetMany(keys)
+
+	if len(values) != len(keys) {
+		t.Errorf("GetMany() returned %d values, expected %d", len(values), len(keys))
+	}
+
+	for _, value := range values {
+		if value != "" {
+			t.Errorf("GetMany() returned non-empty value %s, expected empty", value)
+		}
+	}
+}
+
+func TestGetManyMixed(t *testing.T) {
+	s := &MemLocalStore{}
+	s.Init()
+
+	if err := s.Set("key1", "value1"); err != nil {
+		t.Fatalf("Set error: %v", err)
+	}
+
+	keys := []string{"key1", "nonexistent", "key2"}
+	values := s.GetMany(keys)
+
+	if len(values) != len(keys) {
+		t.Errorf("GetMany() returned %d values, expected %d", len(values), len(keys))
+	}
+
+	if values[0] != "value1" {
+		t.Errorf("GetMany() returned %s for key %s, expected %s", values[0], keys[0], "value1")
+	}
+
+	if values[1] != "" {
+		t.Errorf("GetMany() returned %s for key %s, expected %s", values[1], keys[1], "")
+	}
+
+	if values[2] != "" {
+		t.Errorf("GetMany() returned %s for key %s, expected %s", values[2], keys[2], "")
+	}
+}
+
+func TestGetManyEmptyKeys(t *testing.T) {
+	s := &MemLocalStore{}
+	s.Init()
+
+	keys := []string{}
+	values := s.GetMany(keys)
+
+	if len(values) != 0 {
+		t.Errorf("GetMany() returned %d values, expected 0", len(values))
+	}
+}
+
+func TestGetManyWithoutInit(t *testing.T) {
+	s := &MemLocalStore{}
+
+	keys := []string{"key1", "key2"}
+	values := s.GetMany(keys)
+
+	if len(values) != len(keys) {
+		t.Errorf("GetMany() returned %d values, expected %d", len(values), len(keys))
+	}
+
+	for _, value := range values {
+		if value != "" {
+			t.Errorf("GetMany() returned non-empty value %s, expected empty", value)
+		}
+	}
+}
+
+func TestGetManyConcurrent(t *testing.T) {
+	s := &MemLocalStore{}
+	s.Init()
+
+	const n = 100
+	var wg sync.WaitGroup
+
+	kv := make(map[string]string)
+	for i := 0; i < n; i++ {
+		i := i
+		kv["key"+strconv.Itoa(i)] = "value" + strconv.Itoa(i)
+	}
+	s.SetMany(kv)
+
+	// Get keys concurrently
+	wg.Add(n)
+	for i := 0; i < n; i++ {
+		i := i
+		go func() {
+			defer wg.Done()
+			key := "key" + strconv.Itoa(i)
+			values := s.GetMany([]string{key})
+			if len(values) != 1 || values[0] != "value"+strconv.Itoa(i) {
+				t.Errorf("GetMany() returned %v for key %s, expected [value%d]", values, key, i)
+			}
+		}()
+	}
+
+	wg.Wait()
+}
