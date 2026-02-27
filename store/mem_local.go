@@ -7,11 +7,11 @@ import (
 
 type Store interface {
 	Init() error
-	Set(string, string) error
+	Set(string, string, *int) error
 	Get(string) (string, bool)
 	Delete(string) error
 	Exists(string) bool
-	SetMany(map[string]string) error
+	SetMany(map[string]string, *int) error
 	GetMany([]string) []string
 	DeleteMany([]string) error
 }
