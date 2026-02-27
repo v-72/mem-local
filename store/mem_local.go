@@ -10,6 +10,7 @@ type Store interface {
 	Exists(string) bool
 	SetMany(map[string]string) error
 	GetMany([]string) []string
+	DeleteMany([]string) error
 }
 
 type MemLocalStore struct {
@@ -88,4 +89,17 @@ func (s *MemLocalStore) GetMany(keys []string) []string {
 	}
 
 	return result
+}
+
+func (s *MemLocalStore) DeleteMany(keys []string) error {
+	if len(keys) == 0 {
+		return nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for _, key := range keys {
+		delete(s.data, key)
+	}
+	return nil
 }
