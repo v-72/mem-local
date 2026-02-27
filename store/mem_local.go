@@ -1,6 +1,9 @@
 package store
 
-import "sync"
+import (
+	"sync"
+	"time"
+)
 
 type Store interface {
 	Init() error
@@ -13,28 +16,34 @@ type Store interface {
 	DeleteMany([]string) error
 }
 
+type Value struct {
+	value string
+	ttl   int64
+}
+
 type MemLocalStore struct {
 	mu   sync.RWMutex
-	data map[string]string
+	data map[string]Value
 }
 
 func (s *MemLocalStore) Init() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.data = make(map[string]string)
+	s.data = make(map[string]Value)
 	return nil
 }
 
-func (s *MemLocalStore) Set(k, v string) error {
+func (s *MemLocalStore) Set(k, v string, ttl *int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	if s.data == nil {
-		s.data = make(map[string]string)
+		s.data = make(map[string]Value)
 	}
 
-	s.data[k] = v
+	ttlMili := time.Now().UnixMilli() + int64(getTTL(ttl))
+	s.data[k] = Value{value: v, ttl: ttlMili}
 	return nil
 }
 
@@ -43,7 +52,7 @@ func (s *MemLocalStore) Get(k string) (string, bool) {
 	defer s.mu.RUnlock()
 
 	val, ok := s.data[k]
-	return val, ok
+	return val.value, ok
 }
 
 func (s *MemLocalStore) Delete(k string) error {
@@ -67,11 +76,11 @@ func (s *MemLocalStore) SetMany(kv map[string]string) error {
 	defer s.mu.Unlock()
 
 	if s.data == nil {
-		s.data = make(map[string]string)
+		s.data = make(map[string]Value)
 	}
 
 	for k, v := range kv {
-		s.data[k] = v
+		s.data[k] = Value{value: v, ttl: 0}
 	}
 	return nil
 }
@@ -85,7 +94,7 @@ func (s *MemLocalStore) GetMany(keys []string) []string {
 	result := []string{}
 
 	for _, key := range keys {
-		result = append(result, s.data[key])
+		result = append(result, s.data[key].value)
 	}
 
 	return result
@@ -102,4 +111,11 @@ func (s *MemLocalStore) DeleteMany(keys []string) error {
 		delete(s.data, key)
 	}
 	return nil
+}
+
+func getTTL(ttl *int) int {
+	if ttl == nil || *ttl == 0 {
+		return 0
+	}
+	return *ttl
 }
