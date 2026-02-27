@@ -15,7 +15,8 @@ func main() {
 		fmt.Println("Error initializing local store:", err)
 		return
 	}
-	setStatus := s.Set("TestKey", "TestValue")
+	ttl := 1000
+	setStatus := s.Set("TestKey", "TestValue", &ttl)
 	fmt.Println("\nsetStatus:", setStatus)
 	val, _ := s.Get("TestKey")
 	fmt.Println(val)
