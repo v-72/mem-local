@@ -446,3 +446,140 @@ func TestGetManyConcurrent(t *testing.T) {
 
 	wg.Wait()
 }
+
+func TestDeleteMany(t *testing.T) {
+	s := &MemLocalStore{}
+	s.Init()
+
+	// Add some test data
+	if err := s.Set("key1", "value1"); err != nil {
+		t.Fatalf("Set error: %v", err)
+	}
+	if err := s.Set("key2", "value2"); err != nil {
+		t.Fatalf("Set error: %v", err)
+	}
+	if err := s.Set("key3", "value3"); err != nil {
+		t.Fatalf("Set error: %v", err)
+	}
+
+	// Test deleting multiple keys
+	keysToDelete := []string{"key1", "key3"}
+	if err := s.DeleteMany(keysToDelete); err != nil {
+		t.Fatalf("DeleteMany error: %v", err)
+	}
+
+	// Verify deleted keys are gone
+	for _, key := range keysToDelete {
+		_, ok := s.Get(key)
+		if ok {
+			t.Errorf("Key %s should have been deleted but still exists", key)
+		}
+	}
+
+	// Verify remaining key still exists
+	val, ok := s.Get("key2")
+	if !ok {
+		t.Errorf("Key key2 should still exist")
+	}
+	if val != "value2" {
+		t.Errorf("Key key2 has wrong value: %s, expected value2", val)
+	}
+}
+
+func TestDeleteManyNonExistentKeys(t *testing.T) {
+	s := &MemLocalStore{}
+	s.Init()
+
+	// Add some test data
+	if err := s.Set("key1", "value1"); err != nil {
+		t.Fatalf("Set error: %v", err)
+	}
+
+	// Test deleting non-existent keys
+	keysToDelete := []string{"nonexistent1", "nonexistent2"}
+	if err := s.DeleteMany(keysToDelete); err != nil {
+		t.Fatalf("DeleteMany error: %v", err)
+	}
+
+	// Verify existing key still exists
+	val, ok := s.Get("key1")
+	if !ok {
+		t.Errorf("Key key1 should still exist")
+	}
+	if val != "value1" {
+		t.Errorf("Key key1 has wrong value: %s, expected value1", val)
+	}
+}
+
+func TestDeleteManyEmptyKeys(t *testing.T) {
+	s := &MemLocalStore{}
+	s.Init()
+
+	// Test deleting with empty keys slice
+	keysToDelete := []string{}
+	if err := s.DeleteMany(keysToDelete); err != nil {
+		t.Fatalf("DeleteMany error: %v", err)
+	}
+
+	// Verify store is unchanged
+	val, ok := s.Get("key1")
+	if ok {
+		t.Errorf("Key key1 should not exist: %s", val)
+	}
+}
+
+func TestDeleteManyWithoutInit(t *testing.T) {
+	s := &MemLocalStore{}
+
+	// Test deleting without initializing the store
+	keysToDelete := []string{"key1", "key2"}
+	if err := s.DeleteMany(keysToDelete); err != nil {
+		t.Fatalf("DeleteMany error: %v", err)
+	}
+
+	// Verify store is still empty
+	val, ok := s.Get("key1")
+	if ok {
+		t.Errorf("Key key1 should not exist: %s", val)
+	}
+}
+
+func TestDeleteManyConcurrent(t *testing.T) {
+	s := &MemLocalStore{}
+	s.Init()
+
+	const n = 100
+	var wg sync.WaitGroup
+
+	// Add test data
+	for i := 0; i < n; i++ {
+		key := "key" + strconv.Itoa(i)
+		if err := s.Set(key, "value"+strconv.Itoa(i)); err != nil {
+			t.Fatalf("Set error: %v", err)
+		}
+	}
+
+	// Delete keys concurrently
+	wg.Add(n)
+	for i := 0; i < n; i++ {
+		i := i
+		go func() {
+			defer wg.Done()
+			key := "key" + strconv.Itoa(i)
+			if err := s.DeleteMany([]string{key}); err != nil {
+				t.Errorf("DeleteMany error for key %s: %v", key, err)
+			}
+		}()
+	}
+
+	wg.Wait()
+
+	// Verify all keys are deleted
+	for i := 0; i < n; i++ {
+		key := "key" + strconv.Itoa(i)
+		_, ok := s.Get(key)
+		if ok {
+			t.Errorf("Key %s should have been deleted but still exists", key)
+		}
+	}
+}
