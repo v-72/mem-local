@@ -71,16 +71,16 @@ func (s *MemLocalStore) Exists(k string) bool {
 	return ok
 }
 
-func (s *MemLocalStore) SetMany(kv map[string]string) error {
+func (s *MemLocalStore) SetMany(kv map[string]string, ttl *int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	if s.data == nil {
 		s.data = make(map[string]Value)
 	}
-
+	ttlMili := time.Now().UnixMilli() + int64(getTTL(ttl))
 	for k, v := range kv {
-		s.data[k] = Value{value: v, ttl: 0}
+		s.data[k] = Value{value: v, ttl: ttlMili}
 	}
 	return nil
 }
