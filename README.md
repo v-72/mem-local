@@ -25,12 +25,12 @@ See [example.go](example.go) for usage.
 The store provides the following methods:
 
 - `Init() error` — Initialize the store (clears all data)
-- `Set(key, value string, ttl *int) error` — Store a value with optional TTL (milliseconds)
-- `Get(key string) (string, bool)` — Retrieve a value
+- `Set(key, value string, ttl *int) error` — Store a value with optional TTL in milliseconds. Pass `nil` or `0` for no expiration.
+- `Get(key string) (string, bool)` — Retrieve a value. Checks for expiration and removes expired keys (lazy expiration).
 - `Delete(key string) error` — Remove a key
-- `Exists(key string) bool` — Check if a key exists
-- `SetMany(kv map[string]string, ttl *int) error` — Store multiple values
-- `GetMany(keys []string) []string` — Retrieve multiple values
+- `Exists(key string) bool` — Check if a key exists. Checks for expiration and removes expired keys (lazy expiration).
+- `SetMany(kv map[string]string, ttl *int) error` — Store multiple values with optional TTL
+- `GetMany(keys []string) []string` — Retrieve multiple values. Checks expiration for each key (lazy expiration).
 
 All methods are safe for concurrent use.
 
@@ -63,11 +63,17 @@ s.Delete("foo")
 ### With TTL (Time-To-Live)
 
 ```go
-ttl := 5000 // 5 seconds in milliseconds
+// Set a value with TTL of 5 seconds
+ttl := 5000 // in milliseconds
 s.Set("temp", "data", &ttl)
 
-// Value is automatically expired after 5 seconds
-val, ok := s.Get("temp")
+// Value is accessible before timeout
+val, ok := s.Get("temp") // returns "data", true
+
+// After 5 seconds, accessing the key will return empty and remove it
+// (lazy expiration - checked on access)
+time.Sleep(5100 * time.Millisecond)
+val, ok = s.Get("temp") // returns "", false
 ```
 
 ### Bulk Operations
@@ -95,6 +101,22 @@ values := s.GetMany([]string{"key1", "key2", "key3"})
 ## Usage Notes
 - Data is not persisted across restarts.
 - Designed for testing, prototypes, or local caches where persistence is unnecessary.
+- **Lazy Expiration:** Keys with TTL are checked for expiration only when accessed via `Get()`, `Exists()`, or `GetMany()`. Expired keys are automatically removed at that time.
+- Pass `nil` or `0` as TTL to store keys indefinitely with no expiration.
+- All operations are thread-safe and can be used concurrently.
+
+## Testing
+Run the test suite with:
+
+```bash
+go test ./store -v
+```
+
+The project includes 35+ test cases covering:
+- Concurrent operations
+- TTL and lazy expiration behavior
+- Edge cases (empty values, non-existent keys, uninitialized store)
+- Bulk operations
 
 ## Contributing
 - Issues and PRs are welcome. Please keep changes small and focused.
