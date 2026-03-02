@@ -25,24 +25,65 @@ See [example.go](example.go) for usage.
 The store provides the following methods:
 
 - `Init() error` — Initialize the store (clears all data)
-- `Set(key, value string) error` — Store a value
+- `Set(key, value string, ttl *int) error` — Store a value with optional TTL (milliseconds)
 - `Get(key string) (string, bool)` — Retrieve a value
 - `Delete(key string) error` — Remove a key
 - `Exists(key string) bool` — Check if a key exists
+- `SetMany(kv map[string]string, ttl *int) error` — Store multiple values
+- `GetMany(keys []string) []string` — Retrieve multiple values
 
 All methods are safe for concurrent use.
 
 ## Example Usage
+
+### Basic Operations
 
 ```go
 import "github.com/v-72/mem-local/store"
 
 s := &store.MemLocalStore{}
 _ = s.Init()
-s.Set("foo", "bar")
+
+// Set a value without TTL
+s.Set("foo", "bar", nil)
+
+// Retrieve a value
 val, ok := s.Get("foo")
-exists := s.Exists("foo")
+if ok {
+    fmt.Println(val) // "bar"
+}
+
+// Check if key exists
+exists := s.Exists("foo") // true
+
+// Delete a key
 s.Delete("foo")
+```
+
+### With TTL (Time-To-Live)
+
+```go
+ttl := 5000 // 5 seconds in milliseconds
+s.Set("temp", "data", &ttl)
+
+// Value is automatically expired after 5 seconds
+val, ok := s.Get("temp")
+```
+
+### Bulk Operations
+
+```go
+// Set multiple values
+data := map[string]string{
+    "key1": "value1",
+    "key2": "value2",
+    "key3": "value3",
+}
+ttl := 10000 // 10 seconds
+s.SetMany(data, &ttl)
+
+// Get multiple values
+values := s.GetMany([]string{"key1", "key2", "key3"})
 ```
 
 ## Project Layout
