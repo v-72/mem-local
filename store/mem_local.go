@@ -48,11 +48,21 @@ func (s *MemLocalStore) Set(k, v string, ttl *int) error {
 }
 
 func (s *MemLocalStore) Get(k string) (string, bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	val, ok := s.data[k]
-	return val.value, ok
+	if !ok {
+		return "", false
+	}
+
+	// Lazy expiration: check if the key has expired
+	if val.ttl > 0 && time.Now().UnixMilli() > val.ttl {
+		delete(s.data, k)
+		return "", false
+	}
+
+	return val.value, true
 }
 
 func (s *MemLocalStore) Delete(k string) error {
@@ -64,11 +74,21 @@ func (s *MemLocalStore) Delete(k string) error {
 }
 
 func (s *MemLocalStore) Exists(k string) bool {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-	_, ok := s.data[k]
-	return ok
+	val, ok := s.data[k]
+	if !ok {
+		return false
+	}
+
+	// Lazy expiration: check if the key has expired
+	if val.ttl > 0 && time.Now().UnixMilli() > val.ttl {
+		delete(s.data, k)
+		return false
+	}
+
+	return true
 }
 
 func (s *MemLocalStore) SetMany(kv map[string]string, ttl *int) error {
@@ -92,9 +112,22 @@ func (s *MemLocalStore) GetMany(keys []string) []string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	result := []string{}
+	now := time.Now().UnixMilli()
 
 	for _, key := range keys {
-		result = append(result, s.data[key].value)
+		val, ok := s.data[key]
+		if !ok {
+			result = append(result, "")
+			continue
+		}
+
+		// Lazy expiration: check if the key has expired
+		if val.ttl > 0 && now > val.ttl {
+			delete(s.data, key)
+			result = append(result, "")
+		} else {
+			result = append(result, val.value)
+		}
 	}
 
 	return result
