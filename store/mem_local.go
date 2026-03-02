@@ -42,7 +42,13 @@ func (s *MemLocalStore) Set(k, v string, ttl *int) error {
 		s.data = make(map[string]Value)
 	}
 
-	ttlMili := time.Now().UnixMilli() + int64(getTTL(ttl))
+	var ttlMili int64
+	if ttl == nil || *ttl == 0 {
+		// No expiration
+		ttlMili = -1
+	} else {
+		ttlMili = time.Now().UnixMilli() + int64(*ttl)
+	}
 	s.data[k] = Value{value: v, ttl: ttlMili}
 	return nil
 }
@@ -56,8 +62,8 @@ func (s *MemLocalStore) Get(k string) (string, bool) {
 		return "", false
 	}
 
-	// Lazy expiration: check if the key has expired
-	if val.ttl > 0 && time.Now().UnixMilli() > val.ttl {
+	// Lazy expiration: check if the key has expired (ttl != -1 means it has TTL)
+	if val.ttl != -1 && time.Now().UnixMilli() > val.ttl {
 		delete(s.data, k)
 		return "", false
 	}
@@ -82,8 +88,8 @@ func (s *MemLocalStore) Exists(k string) bool {
 		return false
 	}
 
-	// Lazy expiration: check if the key has expired
-	if val.ttl > 0 && time.Now().UnixMilli() > val.ttl {
+	// Lazy expiration: check if the key has expired (ttl != -1 means it has TTL)
+	if val.ttl != -1 && time.Now().UnixMilli() > val.ttl {
 		delete(s.data, k)
 		return false
 	}
@@ -98,7 +104,15 @@ func (s *MemLocalStore) SetMany(kv map[string]string, ttl *int) error {
 	if s.data == nil {
 		s.data = make(map[string]Value)
 	}
-	ttlMili := time.Now().UnixMilli() + int64(getTTL(ttl))
+
+	var ttlMili int64
+	if ttl == nil || *ttl == 0 {
+		// No expiration
+		ttlMili = -1
+	} else {
+		ttlMili = time.Now().UnixMilli() + int64(*ttl)
+	}
+
 	for k, v := range kv {
 		s.data[k] = Value{value: v, ttl: ttlMili}
 	}
@@ -121,8 +135,8 @@ func (s *MemLocalStore) GetMany(keys []string) []string {
 			continue
 		}
 
-		// Lazy expiration: check if the key has expired
-		if val.ttl > 0 && now > val.ttl {
+		// Lazy expiration: check if the key has expired (ttl != -1 means it has TTL)
+		if val.ttl != -1 && now > val.ttl {
 			delete(s.data, key)
 			result = append(result, "")
 		} else {
@@ -144,11 +158,4 @@ func (s *MemLocalStore) DeleteMany(keys []string) error {
 		delete(s.data, key)
 	}
 	return nil
-}
-
-func getTTL(ttl *int) int {
-	if ttl == nil || *ttl == 0 {
-		return 0
-	}
-	return *ttl
 }

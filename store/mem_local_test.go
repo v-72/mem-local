@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"sync"
 	"testing"
+	"time"
 )
 
 func TestConcurrentSetMultipleKeys(t *testing.T) {
@@ -581,5 +582,191 @@ func TestDeleteManyConcurrent(t *testing.T) {
 		if ok {
 			t.Errorf("Key %s should have been deleted but still exists", key)
 		}
+	}
+}
+func TestSetWithTTL(t *testing.T) {
+	s := &MemLocalStore{}
+	s.Init()
+
+	ttl := 5000 // 5 seconds
+	if err := s.Set("key1", "value1", &ttl); err != nil {
+		t.Fatalf("Set error: %v", err)
+	}
+
+	val, ok := s.Get("key1")
+	if !ok || val != "value1" {
+		t.Errorf("Set with TTL failed, got %v, %v", val, ok)
+	}
+}
+
+func TestGetWithTTLExpired(t *testing.T) {
+	s := &MemLocalStore{}
+	s.Init()
+
+	// Set with very short TTL (1 millisecond)
+	ttl := 1
+	if err := s.Set("key1", "value1", &ttl); err != nil {
+		t.Fatalf("Set error: %v", err)
+	}
+
+	// Wait a bit to ensure expiration
+	time.Sleep(10 * time.Millisecond)
+
+	val, ok := s.Get("key1")
+	if ok {
+		t.Errorf("Get should return false for expired key, got %v, %v", val, ok)
+	}
+	if val != "" {
+		t.Errorf("Get should return empty string for expired key, got %s", val)
+	}
+}
+
+func TestGetWithTTLNotExpired(t *testing.T) {
+	s := &MemLocalStore{}
+	s.Init()
+
+	// Set with long TTL
+	ttl := 10000 // 10 seconds
+	if err := s.Set("key1", "value1", &ttl); err != nil {
+		t.Fatalf("Set error: %v", err)
+	}
+
+	val, ok := s.Get("key1")
+	if !ok || val != "value1" {
+		t.Errorf("Get should return value for non-expired key, got %v, %v", val, ok)
+	}
+}
+
+func TestExistsWithTTLExpired(t *testing.T) {
+	s := &MemLocalStore{}
+	s.Init()
+
+	// Set with very short TTL
+	ttl := 1
+	if err := s.Set("key1", "value1", &ttl); err != nil {
+		t.Fatalf("Set error: %v", err)
+	}
+
+	if !s.Exists("key1") {
+		t.Error("Exists should return true before expiration")
+	}
+
+	// Wait for expiration
+	time.Sleep(10 * time.Millisecond)
+
+	if s.Exists("key1") {
+		t.Error("Exists should return false after expiration")
+	}
+}
+
+func TestGetManyWithTTLExpired(t *testing.T) {
+	s := &MemLocalStore{}
+	s.Init()
+
+	// Set some keys without TTL
+	if err := s.Set("key1", "value1", nil); err != nil {
+		t.Fatalf("Set error: %v", err)
+	}
+
+	// Set key with very short TTL
+	ttl := 1
+	if err := s.Set("key2", "value2", &ttl); err != nil {
+		t.Fatalf("Set error: %v", err)
+	}
+
+	// Set another key without TTL
+	if err := s.Set("key3", "value3", nil); err != nil {
+		t.Fatalf("Set error: %v", err)
+	}
+
+	// Wait for expiration
+	time.Sleep(10 * time.Millisecond)
+
+	values := s.GetMany([]string{"key1", "key2", "key3"})
+
+	if len(values) != 3 {
+		t.Errorf("GetMany returned %d values, expected 3", len(values))
+	}
+
+	if values[0] != "value1" {
+		t.Errorf("GetMany: key1 should be 'value1', got '%s'", values[0])
+	}
+
+	if values[1] != "" {
+		t.Errorf("GetMany: key2 should be empty (expired), got '%s'", values[1])
+	}
+
+	if values[2] != "value3" {
+		t.Errorf("GetMany: key3 should be 'value3', got '%s'", values[2])
+	}
+}
+
+func TestLazyExpirationRemovesKey(t *testing.T) {
+	s := &MemLocalStore{}
+	s.Init()
+
+	// Set with very short TTL
+	ttl := 1
+	if err := s.Set("key1", "value1", &ttl); err != nil {
+		t.Fatalf("Set error: %v", err)
+	}
+
+	// Wait for expiration
+	time.Sleep(10 * time.Millisecond)
+
+	// Get should remove the expired key
+	_, _ = s.Get("key1")
+
+	// Now insert new key and verify lazy deletion removed the old one
+	if err := s.Set("newkey", "newvalue", nil); err != nil {
+		t.Fatalf("Set error: %v", err)
+	}
+
+	// Try to get the original expired key - it should not exist
+	val, ok := s.Get("key1")
+	if ok {
+		t.Errorf("Lazy expiration should have removed key1, but got %v, %v", val, ok)
+	}
+}
+
+func TestSetManyWithTTL(t *testing.T) {
+	s := &MemLocalStore{}
+	s.Init()
+
+	ttl := 5000 // 5 seconds
+	data := map[string]string{
+		"key1": "value1",
+		"key2": "value2",
+		"key3": "value3",
+	}
+
+	if err := s.SetMany(data, &ttl); err != nil {
+		t.Fatalf("SetMany error: %v", err)
+	}
+
+	for k, expected := range data {
+		val, ok := s.Get(k)
+		if !ok || val != expected {
+			t.Errorf("SetMany with TTL: Get(%s) = %v, %v; expected %s, true", k, val, ok, expected)
+		}
+	}
+}
+
+func TestTTLZeroMeansNoExpiration(t *testing.T) {
+	s := &MemLocalStore{}
+	s.Init()
+
+	// TTL of 0 should mean no expiration
+	ttl := 0
+	if err := s.Set("key1", "value1", &ttl); err != nil {
+		t.Fatalf("Set error: %v", err)
+	}
+
+	// Even after a long wait, key should still exist because ttl is 0
+	time.Sleep(10 * time.Millisecond)
+
+	val, ok := s.Get("key1")
+	if !ok || val != "value1" {
+		t.Errorf("TTL of 0 should mean no expiration, got %v, %v", val, ok)
 	}
 }
