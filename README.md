@@ -1,34 +1,5 @@
 # mem-local
 
-A small Go project providing a simple in-memory local store. This repository contains a minimal example application and a lightweight `store` implementation intended for local, ephemeral usage and testing.
-
-**Status:** minimal example / reference implementation
-
-**Prerequisites:**
-
-**Quick Start**
-
-Build and run the example locally:
-
-```bash
-go build -o mem-local .
-./mem-local
-# or, during development:
-go run main.go
-```
-
-Check `main.go` for how the store is constructed and used at runtime.
-
-**Project Layout**
-
-**Usage Notes**
-
-**Contributing**
-
-**License**
-
-# mem-local
-
 An in-memory key-value store for Go, designed for local, ephemeral usage, testing, and prototyping. Includes a minimal example application and a thread-safe store implementation.
 
 **Status:** Minimal reference implementation
