@@ -5,6 +5,12 @@ import (
 	"time"
 )
 
+// Package store provides a simple in-memory key/value store implementation
+// with optional per-key TTL (time-to-live). TTLs are stored as absolute
+// Unix milliseconds timestamps. A ttl value of -1 indicates no expiration.
+
+// Store defines the minimal in-memory store operations used by callers.
+// Implementations should be safe for concurrent use.
 type Store interface {
 	Init() error
 	Set(string, string, *int) error
@@ -16,16 +22,23 @@ type Store interface {
 	DeleteMany([]string) error
 }
 
+// Value holds a stored string and an expiration timestamp (Unix milliseconds).
+// If ttl == -1 the value does not expire.
 type Value struct {
 	value string
 	ttl   int64
 }
 
+// MemLocalStore is a simple in-memory implementation of Store. It uses a
+// read-write mutex to guard access to the underlying map. Note: some methods
+// acquire a write lock even for reads because they may remove expired keys
+// lazily while servicing a read.
 type MemLocalStore struct {
 	mu   sync.RWMutex
 	data map[string]Value
 }
 
+// Init initializes internal structures. Safe to call multiple times.
 func (s *MemLocalStore) Init() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -34,6 +47,10 @@ func (s *MemLocalStore) Init() error {
 	return nil
 }
 
+// Set stores a single key with an optional TTL. The provided ttl is treated
+// as an offset in milliseconds from now and converted to an absolute Unix
+// millisecond timestamp stored in Value.ttl. A nil or zero ttl means no
+// expiration (ttl == -1).
 func (s *MemLocalStore) Set(k, v string, ttl *int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -53,6 +70,8 @@ func (s *MemLocalStore) Set(k, v string, ttl *int) error {
 	return nil
 }
 
+// Get returns the value for a key and whether it existed and was not
+// expired. Expired keys are removed lazily on access.
 func (s *MemLocalStore) Get(k string) (string, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -62,7 +81,7 @@ func (s *MemLocalStore) Get(k string) (string, bool) {
 		return "", false
 	}
 
-	// Lazy expiration: check if the key has expired (ttl != -1 means it has TTL)
+	// Lazy expiration: remove and report missing if expired.
 	if val.ttl != -1 && time.Now().UnixMilli() > val.ttl {
 		delete(s.data, k)
 		return "", false
@@ -71,6 +90,7 @@ func (s *MemLocalStore) Get(k string) (string, bool) {
 	return val.value, true
 }
 
+// Delete removes a key from the store.
 func (s *MemLocalStore) Delete(k string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -79,6 +99,8 @@ func (s *MemLocalStore) Delete(k string) error {
 	return nil
 }
 
+// Exists reports whether a key exists and has not expired. Expired keys are
+// removed lazily.
 func (s *MemLocalStore) Exists(k string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -88,7 +110,7 @@ func (s *MemLocalStore) Exists(k string) bool {
 		return false
 	}
 
-	// Lazy expiration: check if the key has expired (ttl != -1 means it has TTL)
+	// Lazy expiration: remove and report missing if expired.
 	if val.ttl != -1 && time.Now().UnixMilli() > val.ttl {
 		delete(s.data, k)
 		return false
@@ -97,6 +119,9 @@ func (s *MemLocalStore) Exists(k string) bool {
 	return true
 }
 
+// SetMany stores multiple keys with the same optional TTL. TTL semantics are
+// the same as for Set: nil or zero = no expiration, otherwise ttl is treated
+// as milliseconds offset from now.
 func (s *MemLocalStore) SetMany(kv map[string]string, ttl *int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -119,6 +144,8 @@ func (s *MemLocalStore) SetMany(kv map[string]string, ttl *int) error {
 	return nil
 }
 
+// GetMany returns values for the provided keys in the same order. For keys
+// that do not exist or have expired an empty string is returned in that slot.
 func (s *MemLocalStore) GetMany(keys []string) []string {
 	if len(keys) == 0 {
 		return []string{}
@@ -135,7 +162,7 @@ func (s *MemLocalStore) GetMany(keys []string) []string {
 			continue
 		}
 
-		// Lazy expiration: check if the key has expired (ttl != -1 means it has TTL)
+		// Lazy expiration: remove expired keys and return empty slot.
 		if val.ttl != -1 && now > val.ttl {
 			delete(s.data, key)
 			result = append(result, "")
@@ -147,6 +174,7 @@ func (s *MemLocalStore) GetMany(keys []string) []string {
 	return result
 }
 
+// DeleteMany removes multiple keys from the store.
 func (s *MemLocalStore) DeleteMany(keys []string) error {
 	if len(keys) == 0 {
 		return nil
