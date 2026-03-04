@@ -31,6 +31,8 @@ The store provides the following methods:
 - `Exists(key string) bool` — Check if a key exists. Checks for expiration and removes expired keys (lazy expiration).
 - `SetMany(kv map[string]string, ttl *int) error` — Store multiple values with optional TTL
 - `GetMany(keys []string) []string` — Retrieve multiple values. Checks expiration for each key (lazy expiration).
+- `StartJanitor(interval time.Duration)` — Start a background goroutine that periodically purges expired entries. Called automatically by `Init()` with a 1‑second interval; you can call again with a custom interval (e.g. for faster cleanup in tests).
+- `StopJanitor()` — Stops the background janitor, if running (safe to call multiple times).
 
 All methods are safe for concurrent use.
 
@@ -101,7 +103,7 @@ values := s.GetMany([]string{"key1", "key2", "key3"})
 ## Usage Notes
 - Data is not persisted across restarts.
 - Designed for testing, prototypes, or local caches where persistence is unnecessary.
-- **Lazy Expiration:** Keys with TTL are checked for expiration only when accessed via `Get()`, `Exists()`, or `GetMany()`. Expired keys are automatically removed at that time.
+- **Lazy Expiration:** Keys with TTL are checked for expiration when accessed via `Get()`, `Exists()`, or `GetMany()` (lazy removal). Additionally, a background janitor goroutine—started automatically by `Init()`—periodically scans the store and deletes expired entries, ensuring they disappear even if they are never touched again.
 - Pass `nil` or `0` as TTL to store keys indefinitely with no expiration.
 - All operations are thread-safe and can be used concurrently.
 

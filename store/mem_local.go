@@ -34,16 +34,22 @@ type Value struct {
 // acquire a write lock even for reads because they may remove expired keys
 // lazily while servicing a read.
 type MemLocalStore struct {
-	mu   sync.RWMutex
-	data map[string]Value
+	mu          sync.RWMutex
+	data        map[string]Value
+	janitorStop chan struct{} // channel to signal janitor goroutine to exit
 }
 
 // Init initializes internal structures. Safe to call multiple times.
+// It also starts the background janitor using a default interval of 1 second.
 func (s *MemLocalStore) Init() error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
+	if s.data == nil {
+		s.data = make(map[string]Value)
+	}
+	s.mu.Unlock()
 
-	s.data = make(map[string]Value)
+	// start janitor if not already running
+	s.StartJanitor(time.Second)
 	return nil
 }
 
@@ -146,6 +152,7 @@ func (s *MemLocalStore) SetMany(kv map[string]string, ttl *int) error {
 
 // GetMany returns values for the provided keys in the same order. For keys
 // that do not exist or have expired an empty string is returned in that slot.
+// Expiration is still checked lazily in case janitor hasn't run yet.
 func (s *MemLocalStore) GetMany(keys []string) []string {
 	if len(keys) == 0 {
 		return []string{}
@@ -186,4 +193,70 @@ func (s *MemLocalStore) DeleteMany(keys []string) error {
 		delete(s.data, key)
 	}
 	return nil
+}
+
+// cleanupExpired iterates over the map and deletes any keys whose TTL has
+// passed. It acquires the write lock itself and is safe to call from the
+// janitor goroutine or other internal callers.
+func (s *MemLocalStore) cleanupExpired() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	now := time.Now().UnixMilli()
+	for k, v := range s.data {
+		if v.ttl != -1 && now > v.ttl {
+			delete(s.data, k)
+		}
+	}
+}
+
+// StartJanitor begins a background goroutine that periodically cleans up
+// expired keys. The interval parameter controls how often the cleanup runs;
+// a non-positive value defaults to 1 second. It is safe to call multiple
+// times; only one goroutine will be started. The janitor can be stopped with
+// StopJanitor.
+func (s *MemLocalStore) StartJanitor(interval time.Duration) {
+	if interval <= 0 {
+		interval = time.Second
+	}
+
+	s.mu.Lock()
+	if s.janitorStop != nil {
+		// already running
+		s.mu.Unlock()
+		return
+	}
+	stop := make(chan struct{})
+	s.janitorStop = stop
+	s.mu.Unlock()
+
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				s.cleanupExpired()
+			case <-stop:
+				return
+			}
+		}
+	}()
+}
+
+// StopJanitor signals the background janitor goroutine to exit and waits for
+// it to shut down by closing the stop channel. Calling StopJanitor on a store
+// with no running janitor is a no-op.
+func (s *MemLocalStore) StopJanitor() {
+	s.mu.Lock()
+	stop := s.janitorStop
+	if stop == nil {
+		s.mu.Unlock()
+		return
+	}
+	// clear field while holding lock
+	s.janitorStop = nil
+	s.mu.Unlock()
+
+	close(stop)
 }

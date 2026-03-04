@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	fmt.Println("=== mem-local Store Examples ===\n")
+	fmt.Println("=== mem-local Store Examples ===")
 
 	// Initialize the store
 	s := &store.MemLocalStore{}

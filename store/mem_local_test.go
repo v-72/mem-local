@@ -770,3 +770,33 @@ func TestTTLZeroMeansNoExpiration(t *testing.T) {
 		t.Errorf("TTL of 0 should mean no expiration, got %v, %v", val, ok)
 	}
 }
+
+func TestBackgroundJanitorRemovesExpired(t *testing.T) {
+s := &MemLocalStore{}
+s.Init()
+
+// restart janitor with a fast interval so the test completes quickly
+s.StopJanitor()
+s.StartJanitor(10 * time.Millisecond)
+defer s.StopJanitor()
+
+ttl := 1 // 1 millisecond
+if err := s.Set("key1", "value1", &ttl); err != nil {
+t.Fatalf("Set error: %v", err)
+}
+
+// sleep long enough for key to expire and janitor to run
+time.Sleep(50 * time.Millisecond)
+
+if s.Exists("key1") {
+t.Error("Background janitor should have removed expired key1")
+}
+}
+
+func TestJanitorStoppedDoesNotPanic(t *testing.T) {
+s := &MemLocalStore{}
+s.Init()
+// ensure StopJanitor is safe when called multiple times
+s.StopJanitor()
+s.StopJanitor()
+}
