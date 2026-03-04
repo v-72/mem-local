@@ -1,6 +1,7 @@
 package store
 
 import (
+	"fmt"
 	"strconv"
 	"sync"
 	"testing"
@@ -799,4 +800,102 @@ s.Init()
 // ensure StopJanitor is safe when called multiple times
 s.StopJanitor()
 s.StopJanitor()
+}
+
+func TestStartJanitorDefaultInterval(t *testing.T) {
+s := &MemLocalStore{}
+s.Init()
+// stop and restart with zero interval; should default to 1s but we'll
+// override TTL to a tiny value and wait a bit longer than one tick.
+s.StopJanitor()
+s.StartJanitor(0) // default interval
+defer s.StopJanitor()
+
+ttl := 1
+if err := s.Set("foo", "bar", &ttl); err != nil {
+t.Fatalf("Set error: %v", err)
+}
+
+// wait for >1s just to be sure the default ticker fired at least once
+time.Sleep(1100 * time.Millisecond)
+
+if s.Exists("foo") {
+t.Error("Janitor with default interval should have cleaned expired key")
+}
+}
+
+func TestInitMultipleDoesNotSpawnExtraJanitor(t *testing.T) {
+s := &MemLocalStore{}
+s.Init()
+stop1 := s.janitorStop
+s.Init() // called again, should reuse same channel
+stop2 := s.janitorStop
+if stop1 == nil || stop2 == nil {
+t.Fatal("janitorStop should be initialized")
+}
+if stop1 != stop2 {
+t.Error("Init() called twice should not create a second janitor")
+}
+}
+
+func TestStopJanitorDoesNotAffectStoreOps(t *testing.T) {
+s := &MemLocalStore{}
+s.Init()
+s.StopJanitor()
+// after stopping janitor, store should still function normally
+if err := s.Set("a", "b", nil); err != nil {
+t.Fatalf("Set after StopJanitor failed: %v", err)
+}
+if val, ok := s.Get("a"); !ok || val != "b" {
+t.Errorf("Get after StopJanitor returned %v,%v; want b,true", val, ok)
+}
+}
+
+func TestStartJanitorNegativeInterval(t *testing.T) {
+s := &MemLocalStore{}
+s.Init()
+s.StopJanitor()
+s.StartJanitor(-5) // should treat as default
+defer s.StopJanitor()
+
+ttl := 1
+if err := s.Set("x", "y", &ttl); err != nil {
+t.Fatalf("Set error: %v", err)
+}
+time.Sleep(1100 * time.Millisecond)
+if s.Exists("x") {
+t.Error("Janitor should have cleaned expired key with negative interval")
+}
+}
+
+func TestConcurrentJanitorAndSets(t *testing.T) {
+s := &MemLocalStore{}
+s.Init()
+// use fast janitor
+s.StopJanitor()
+s.StartJanitor(10 * time.Millisecond)
+defer s.StopJanitor()
+
+const n = 200
+var wg sync.WaitGroup
+wg.Add(n)
+
+for i := 0; i < n; i++ {
+i := i
+go func() {
+defer wg.Done()
+ttl := 5 // quick expiry
+s.Set(fmt.Sprintf("k%d", i), "v", &ttl)
+}()
+}
+wg.Wait()
+
+// wait for janitor to expire all entries
+time.Sleep(100 * time.Millisecond)
+
+for i := 0; i < n; i++ {
+if s.Exists(fmt.Sprintf("k%d", i)) {
+t.Errorf("key k%d should have been removed by janitor", i)
+}
+}
 }
