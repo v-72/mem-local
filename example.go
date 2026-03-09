@@ -104,6 +104,17 @@ func main() {
 	mixed := s.GetMany([]string{"exists:1", "nonexistent", "exists:3"})
 	fmt.Printf("   GetMany on mixed keys: %v\n", mixed)
 
+	// Example 10: DeleteMany - Bulk Delete Operations
+	fmt.Println("\n10. DeleteMany - Bulk Delete Operations")
+	s.Set("user:10", "Alice", nil)
+	s.Set("user:11", "Bob", nil)
+	s.Set("user:12", "Charlie", nil)
+	s.Set("user:13", "Diana", nil)
+	fmt.Printf("   Before delete - user:10 exists: %v, user:11 exists: %v\n", s.Exists("user:10"), s.Exists("user:11"))
+	s.DeleteMany([]string{"user:10", "user:11"})
+	fmt.Printf("   After delete - user:10 exists: %v, user:11 exists: %v\n", s.Exists("user:10"), s.Exists("user:11"))
+	fmt.Printf("   user:12 still exists: %v, user:13 still exists: %v\n", s.Exists("user:12"), s.Exists("user:13"))
+
 	fmt.Println("\n=== End of Examples ===")
 }
 

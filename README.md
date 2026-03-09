@@ -122,6 +122,3 @@ The project includes 35+ test cases covering:
 
 ## Contributing
 - Issues and PRs are welcome. Please keep changes small and focused.
-
-## License
-- No license included. Add one (`LICENSE`) if you intend to open-source this project.
